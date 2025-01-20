@@ -10,6 +10,7 @@ use Slim\App;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Faker\Factory as Faker;
 
 class PopulateDatabaseCommand extends Command
 {
@@ -33,6 +34,7 @@ class PopulateDatabaseCommand extends Command
 
         /** @var \Illuminate\Database\Capsule\Manager $db */
         $db = $this->app->getContainer()->get('db');
+        $faker = Faker::create('fr_FR');
 
         $db->getConnection()->statement("SET FOREIGN_KEY_CHECKS=0");
         $db->getConnection()->statement("TRUNCATE `employees`");
@@ -41,33 +43,68 @@ class PopulateDatabaseCommand extends Command
         $db->getConnection()->statement("SET FOREIGN_KEY_CHECKS=1");
 
 
-        $db->getConnection()->statement("INSERT INTO `companies` VALUES
-    (1,'Stack Exchange','0601010101','stack@exchange.com','https://stackexchange.com/','https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Verisure_information_technology_department_at_Ch%C3%A2tenay-Malabry_-_2019-01-10.jpg/1920px-Verisure_information_technology_department_at_Ch%C3%A2tenay-Malabry_-_2019-01-10.jpg', now(), now(), null),
-    (2,'Google','0602020202','contact@google.com','https://www.google.com','https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Google_office_%284135991953%29.jpg/800px-Google_office_%284135991953%29.jpg?20190722090506',now(), now(), null)
-        ");
-
-        $db->getConnection()->statement("INSERT INTO `offices` VALUES
-    (1,'Bureau de Nancy','1 rue Stanistlas','Nancy','54000','France','nancy@stackexchange.com',NULL,1, now(), now()),
-    (2,'Burea de Vandoeuvre','46 avenue Jeanne d\'Arc','Vandoeuvre','54500','France',NULL,NULL,1, now(), now()),
-    (3,'Siege sociale','2 rue de la primatiale','Paris','75000','France',NULL,NULL,2, now(), now()),
-    (4,'Bureau Berlinois','192 avenue central','Berlin','12277','Allemagne',NULL,NULL,2, now(), now())
-        ");
-
-        $db->getConnection()->statement("INSERT INTO `employees` VALUES
-     (1,'Camille','La Chenille',1,'camille.la@chenille.com',NULL,'Ingénieur', now(), now()),
-     (2,'Albert','Mudhat',2,'albert.mudhat@aqume.net',NULL,'Superviseur', now(), now()),
-     (3,'Sylvie','Tesse',3,'sylive.tesse@factice.local',NULL,'PDG', now(), now()),
-     (4,'John','Doe',4,'john.doe@generique.org',NULL,'Testeur', now(), now()),
-     (5,'Jean','Bon',1,'jean@test.com',NULL,'Developpeur', now(), now()),
-     (6,'Anais','Dufour',2,'anais@aqume.net',NULL,'DBA', now(), now()),
-     (7,'Sylvain','Poirson',3,'sylvain@factice.local',NULL,'Administrateur réseau', now(), now()),
-     (8,'Telma','Thiriet',4,'telma@generique.org',NULL,'Juriste', now(), now())
-        ");
+        $this->generateCompanies($db, $faker, 4);
+        $this->generateOffice($db, $faker, 3);
+        $this->generateEmployee($db, $faker, 10);
 
         $db->getConnection()->statement("update companies set head_office_id = 1 where id = 1;");
         $db->getConnection()->statement("update companies set head_office_id = 3 where id = 2;");
 
         $output->writeln('Database created successfully!');
         return 0;
+    }
+
+    protected function generateCompanies($db, $faker, $nbCompanies)
+    {   
+        $rq = "INSERT INTO `companies` VALUES ";
+        for ($i = 0; $i < $nbCompanies; $i++) {
+            $companyId = $i + 1;
+            $companyName = $faker->company();
+            $companyNumber = $faker->e164PhoneNumber();
+            $companyEmail = $faker->companyEmail();
+            $companyWebsite = $faker->url();
+
+            $statement = "('$companyId', '$companyName', '$companyNumber', '$companyEmail', '$companyWebsite', null, now(), now(), null)";
+            echo $rq . $statement . "\n";
+            $db->getConnection()->statement($rq . $statement);
+        }
+    }
+
+    protected function generateOffice($db, $faker, $nbOffices)
+    {   
+        $rq = "INSERT INTO `offices` VALUES ";
+        for ($i = 0; $i < $nbOffices; $i++) {
+            $officeId = $i + 1;
+            $city = $faker->city();
+            $officeName = 'Bureau à ' . $city;
+            $officeStreet = $faker->streetAddress();
+            $officeZipCode = $faker->postcode();
+            $officeCountry = $faker->country();
+            $officeEmail = $faker->companyEmail();
+            $officePhone = $faker->e164PhoneNumber();
+            $companyId = $faker->randomElement($db->getConnection()->select("SELECT id FROM companies"))->id;
+            $statement = "($officeId, '$officeName', '$officeStreet', '$city', '$officeZipCode', '$officeCountry', '$officeEmail', '$officePhone', $companyId, now(), now())";
+            echo $rq . $statement . "\n";
+            $db->getConnection()->statement($rq . $statement);
+
+        }
+    }
+
+    protected function generateEmployee($db, $faker, $nbEmployees)
+    {   
+        $rq = "INSERT INTO `employees` VALUES ";
+        for ($i = 0; $i < $nbEmployees; $i++) {
+            $employeeId = $i + 1;
+            $firstName = $faker->firstName();
+            $lastName = $faker->lastName();
+            $officeId = $faker->randomElement($db->getConnection()->select("SELECT id FROM offices"))->id;
+            $email = $faker->email();
+            $phone = $faker->phoneNumber();
+            $jobTitle = $faker->jobTitle();
+
+            $statement ="($employeeId, '$firstName', '$lastName', $officeId, '$email', '$phone', '$jobTitle', now(), now())";
+            echo $rq . $statement . "\n";
+            $db->getConnection()->statement($rq . $statement);
+        }
     }
 }
